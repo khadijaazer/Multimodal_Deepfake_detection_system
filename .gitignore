@@ -1,0 +1,51 @@
+# Python virtual environment
+.venv/
+venv/
+venv312/
+env/
+ENV/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+
+# Model files (on Hugging Face)
+models/
+*.safetensors
+*.bin
+*.pt
+*.pkl
+*.h5
+*.onnx
+
+# Datasets
+data/
+datasets/
+*.csv
+*.parquet
+
+# Local environment
+.env
+.env.local
+*.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Flutter build files
+qdfx_front/qdfx_frontend/build/
+qdfx_front/qdfx_frontend/.dart_tool/
+qdfx_front/qdfx_frontend/.packages
+qdfx_front/qdfx_frontend/.flutter-plugins
+qdfx_front/qdfx_frontend/ios/.generated/
+qdfx_front/qdfx_frontend/android/.gradle/
+
+# OS files
+Thumbs.db
+.DS_Store
