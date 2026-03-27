@@ -55,24 +55,27 @@ class Sidebar extends StatelessWidget {
                     isActive: appState.selectedIndex == 0,
                     onTap: () => appState.setIndex(0),
                   ),
+_MenuItem(
+  icon: Icons.cloud_upload_outlined,
+  title: t('upload'),
+  // Set active if index is 4
+  isActive: appState.selectedIndex == 4, 
+  // Set index to 4 when clicked
+  onTap: () => appState.setIndex(4), 
+),
+              _MenuItem(
+  icon: Icons.graphic_eq,
+  title: t('realtime'),
+  isActive: appState.selectedIndex == 5,
+  onTap: () => appState.setIndex(5),
+),
+               
                   _MenuItem(
-                    icon: Icons.cloud_upload_outlined,
-                    title: t('upload'),
-                    isActive: false,
-                    onTap: () {},
-                  ),
-                  _MenuItem(
-                    icon: Icons.graphic_eq,
-                    title: t('realtime'),
-                    isActive: false,
-                    onTap: () {},
-                  ),
-                  _MenuItem(
-                    icon: Icons.history,
-                    title: t('history'),
-                    isActive: false,
-                    onTap: () {},
-                  ),
+  icon: Icons.history, 
+  title: t('history'), 
+  isActive: appState.selectedIndex == 6, // Update index number
+  onTap: () => appState.setIndex(6), // Update index number
+),
                   // --- NEW SCAM SCANNER ITEM ---
                   _MenuItem(
                     icon: Icons.text_snippet_outlined, // Icon representing text

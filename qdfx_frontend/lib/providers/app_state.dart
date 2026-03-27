@@ -25,62 +25,64 @@ class AppState extends ChangeNotifier {
   }
 
   // ----------------------------------------------------------------------
-  // 3. USER DATA & MULTI-ROLE LOGIC
+  // 3. USER DATA (Aligned with Supabase Database)
   // ----------------------------------------------------------------------
-  String _userName = "Karim Benz";
-  String _userEmail = "karim@qdfx.dz";
-  String _userRole = "individual"; // 'individual', 'enterprise', 'police'
+  String _userName = "Guest User";
+  String _userEmail = "";
+  String _companyName = ""; 
+  String _jobTitle = "";
 
-  // Role Specific Data (Managed here for the Profile Screen)
-  String _badgeId = "---";
-  String _rank = "---";
-  String _companyName = "---";
-  String _nifId = "---";
-
-  // Getters
   String get userName => _userName;
   String get userEmail => _userEmail;
-  String get userRole => _userRole;
-  String get badgeId => _badgeId;
-  String get rank => _rank;
   String get companyName => _companyName;
-  String get nifId => _nifId;
+  String get jobTitle => _jobTitle;
 
-  // Function to Update Profile (Used in EditProfileScreen)
+  // ----------------------------------------------------------------------
+  // 4. BILLING & SUBSCRIPTION (Replaces the old "Roles")
+  // ----------------------------------------------------------------------
+  // Plans: 'free', 'pro', 'enterprise'
+  String _subscriptionPlan = "free"; 
+  int _credits = 3; // Give 3 Free trial credits on signup
+
+  String get subscriptionPlan => _subscriptionPlan;
+  int get credits => _credits;
+  
+  // To avoid breaking your existing UI that looks for "userRole"
+  String get userRole => _subscriptionPlan; 
+
+  bool get canUpload => _credits > 0;
+
+  // --- SUPABASE INTEGRATION METHOD ---
+  // Call this right after Supabase Auth succeeds to load real DB data
+  void setLoggedInUser(String name, String email, String plan, int creds, String company) {
+    _userName = name;
+    _userEmail = email;
+    _subscriptionPlan = plan.toLowerCase();
+    _credits = creds;
+    _companyName = company;
+    notifyListeners();
+  }
+
+  // Used to update local UI before pushing to DB
   void updateUserProfile(String name, String email) {
     _userName = name;
     _userEmail = email;
     notifyListeners();
   }
 
-  // ----------------------------------------------------------------------
-  // 4. THE ROLE SWITCHER (FOR TESTING THE 3 DESIGNS)
-  // ----------------------------------------------------------------------
-  void setRole(String role) {
-    _userRole = role.toLowerCase();
+  // Simulate buying credits (Called from Billing Screen)
+  void purchasePlan(String plan, int creditsAmount) {
+    _subscriptionPlan = plan.toLowerCase();
+    _credits += creditsAmount;
+    notifyListeners();
+  }
 
-    // Fill with mock data based on role so you can see the designs work
-    if (_userRole == 'police') {
-      _userName = "Officer Ahmed Yassine";
-      _userEmail = "a.yassine@dgsn.dz";
-      _badgeId = "DGSN-7721-X";
-      _rank = "Chief Inspector";
-    } else if (_userRole == 'enterprise') {
-      _userName = "Media Administrator";
-      _userEmail = "it@ennahar.dz";
-      _companyName = "Ennahar Media Group";
-      _nifId = "0016340092122";
-    } else {
-      _userName = "Karim Benz";
-      _userEmail = "karim@gmail.com";
-      _userRole = "individual";
-      _badgeId = "---";
-      _rank = "---";
-      _companyName = "---";
-      _nifId = "---";
+  // Deduct a credit when doing a Deepfake Scan
+  void deductCredit() {
+    if (_credits > 0) {
+      _credits--;
+      notifyListeners();
     }
-
-    notifyListeners(); // This refreshes all UI components immediately
   }
 
   // ----------------------------------------------------------------------
@@ -119,7 +121,7 @@ class AppState extends ChangeNotifier {
   );
 
   // ----------------------------------------------------------------------
-  // 6. LANGUAGE (Optional but included for SaaS)
+  // 6. LANGUAGE 
   // ----------------------------------------------------------------------
   Locale _currentLocale = const Locale('en');
   Locale get currentLocale => _currentLocale;
