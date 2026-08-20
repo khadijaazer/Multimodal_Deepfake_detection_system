@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../theme/app_theme.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../providers/app_state.dart';
+import '../theme/app_theme.dart';
+import '../l10n/translations.dart';
+import '../screens/landing_screen.dart'; // Import for CircuitBoardPainter
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -11,225 +14,537 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  String _filterType = "All"; // All, Video, Text
   final TextEditingController _searchCtrl = TextEditingController();
+  String _filterType = 'all'; // Use fixed values, not translated strings
+  bool _isLoading = true;
+  List<Map<String, dynamic>> _scans = [];
 
-  // --- MOCK DATA (Simulating Database) ---
-  final List<Map<String, dynamic>> _allHistory = [
-    {
-      "id": "101",
-      "type": "video",
-      "name": "Interview_Clip_04.mp4",
-      "date": "Feb 24, 10:30 AM",
-      "status": "Fake Detected",
-      "confidence": 98.4,
-      "isSafe": false,
-    },
-    {
-      "id": "102",
-      "type": "text",
-      "name": "SMS: 'Urgent Bank Verify...'",
-      "date": "Feb 24, 09:15 AM",
-      "status": "Potential Scam",
-      "confidence": 85.0,
-      "isSafe": false,
-    },
-    {
-      "id": "103",
-      "type": "video",
-      "name": "Zoom_Meeting_Rec.mov",
-      "date": "Feb 23, 04:00 PM",
-      "status": "Authentic",
-      "confidence": 99.1,
-      "isSafe": true,
-    },
-    {
-      "id": "104",
-      "type": "text",
-      "name": "Email: 'Project Update'",
-      "date": "Feb 23, 02:20 PM",
-      "status": "Safe Message",
-      "confidence": 95.5,
-      "isSafe": true,
-    },
-    {
-      "id": "105",
-      "type": "video",
-      "name": "CCTV_Evidence_001.avi",
-      "date": "Feb 22, 11:00 AM",
-      "status": "Fake Detected",
-      "confidence": 92.3,
-      "isSafe": false,
-    },
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _loadScans();
+  }
+
+  String t(BuildContext context, String key) {
+    final appState = Provider.of<AppState>(context, listen: false);
+    return AppTranslations.get(appState.currentLocale.languageCode, key);
+  }
+
+  Future<void> _loadScans() async {
+    try {
+      final user = Supabase.instance.client.auth.currentUser;
+      if (user != null) {
+        final response = await Supabase.instance.client
+            .from('scans')
+            .select()
+            .eq('user_id', user.id)
+            .order('created_at', ascending: false);
+
+        if (mounted) {
+          setState(() {
+            _scans = List<Map<String, dynamic>>.from(response);
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${t(context, 'failedToLoadScans')}: $e'),
+            backgroundColor: const Color(0xFFDC2626),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final appState = Provider.of<AppState>(context);
     final isDark = appState.isDarkMode;
+    final lang = appState.currentLocale.languageCode;
+    
+    String tr(String key) => AppTranslations.get(lang, key);
 
-    // Theme Colors
-    final bgCol = isDark ? const Color(0xFF0B1121) : const Color(0xFFF8FAFC);
-    final cardCol = isDark ? const Color(0xFF151E32) : Colors.white;
-    final textCol = isDark ? Colors.white : const Color(0xFF1E293B);
-    final borderCol = isDark ? Colors.white.withOpacity(0.1) : Colors.grey.shade300;
+    // Dynamic theme colors based on isDark
+    final scaffoldBg = isDark ? const Color(0xFF0F1419) : const Color(0xFFF8FAFC);
+    final cardBg = isDark ? const Color(0xFF1A202C) : Colors.white;
+    final textMain = isDark ? Colors.white : const Color(0xFF1E293B);
+    final textSecondary = isDark ? const Color(0xFFCED9E6) : const Color(0xFF64748B);
+    final accentPrimary = const Color(0xFF0EA5E9);
+    final borderColor = isDark ? const Color(0xFF334155) : Colors.grey.shade300;
+    final statCardBg = isDark ? const Color(0xFF1A202C) : const Color(0xFFF1F5F9);
 
-    // Filter Logic
-    List<Map<String, dynamic>> filteredList = _allHistory.where((item) {
-      bool typeMatch = _filterType == "All" || item['type'] == _filterType.toLowerCase();
-      bool searchMatch = item['name'].toLowerCase().contains(_searchCtrl.text.toLowerCase());
-      return typeMatch && searchMatch;
+    // Circuit colour: white on dark, black on light
+    final circuitColor = (isDark ? Colors.white : Colors.black).withOpacity(0.03);
+
+    // Filter & Search - using fixed filter values
+    final filteredScans = _scans.where((scan) {
+      final matchesFilter = _filterType == 'all' ||
+          scan['scan_type'].toString().toLowerCase() == _filterType;
+      final matchesSearch = _searchCtrl.text.isEmpty ||
+          (scan['file_name'] ?? '').toString().toLowerCase().contains(
+                _searchCtrl.text.toLowerCase(),
+              );
+      return matchesFilter && matchesSearch;
     }).toList();
 
     return Scaffold(
-      backgroundColor: bgCol,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // --- HEADER ---
-            Text("Analysis History", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: textCol)),
-            const SizedBox(height: 20),
-
-            // --- SEARCH & FILTER BAR ---
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: cardCol,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: borderCol),
-              ),
-              child: Row(
-                children: [
-                  // Search Input
-                  Expanded(
-                    child: TextField(
-                      controller: _searchCtrl,
-                      onChanged: (v) => setState(() {}),
-                      style: TextStyle(color: textCol),
-                      decoration: InputDecoration(
-                        hintText: "Search filename or content...",
-                        hintStyle: const TextStyle(color: Colors.grey),
-                        prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                        border: InputBorder.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Filter Dropdown
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    decoration: BoxDecoration(
-                      color: isDark ? Colors.black26 : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        value: _filterType,
-                        dropdownColor: cardCol,
-                        icon: Icon(Icons.filter_list, color: textCol),
-                        style: TextStyle(color: textCol),
-                        items: ["All", "Video", "Text"].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
-                        onChanged: (val) => setState(() => _filterType = val!),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+      backgroundColor: scaffoldBg,
+      body: Stack(
+        children: [
+          // ─── CIRCUIT PATTERN BACKGROUND (always visible) ──────────────
+          Positioned.fill(
+            child: CustomPaint(
+              painter: CircuitBoardPainter(color: circuitColor),
             ),
+          ),
+          // ─── SCROLLABLE CONTENT ───────────────────────────────────────
+          SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 12),
 
-            const SizedBox(height: 24),
+                // Header
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      tr('analysisHistory'),
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w900,
+                        color: textMain,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      tr('historySubtitle'),
+                      style: TextStyle(
+                        color: textSecondary,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                  ],
+                ),
 
-            // --- HISTORY LIST ---
-            if (filteredList.isEmpty)
-              Center(child: Padding(padding: const EdgeInsets.all(40), child: Text("No history found", style: TextStyle(color: textCol))))
-            else
-              ListView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: filteredList.length,
-                itemBuilder: (context, index) {
-                  return _buildHistoryCard(filteredList[index], isDark, cardCol, textCol, borderCol);
-                },
-              ),
-          ],
-        ),
+                const SizedBox(height: 24),
+
+                // Stats Cards
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        tr('totalScans'),
+                        _scans.length.toString(),
+                        Icons.analytics_rounded,
+                        accentPrimary,
+                        textSecondary,
+                        statCardBg,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        tr('threatsFound'),
+                        _scans.where((s) => s['is_threat'] == true).length.toString(),
+                        Icons.warning_rounded,
+                        const Color(0xFFDC2626),
+                        textSecondary,
+                        statCardBg,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        tr('safeResults'),
+                        _scans.where((s) => s['is_threat'] == false).length.toString(),
+                        Icons.verified_user_rounded,
+                        const Color(0xFF10B981),
+                        textSecondary,
+                        statCardBg,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 32),
+
+                // Search & Filter
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: cardBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: borderColor.withOpacity(0.5),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _searchCtrl,
+                          onChanged: (v) => setState(() {}),
+                          style: TextStyle(
+                            color: textMain,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                          decoration: InputDecoration(
+                            hintText: tr('searchByFilename'),
+                            hintStyle: TextStyle(
+                              color: textSecondary.withOpacity(0.5),
+                              fontWeight: FontWeight.w400,
+                            ),
+                            prefixIcon: Icon(
+                              Icons.search_rounded,
+                              color: textSecondary.withOpacity(0.7),
+                              size: 18,
+                            ),
+                            border: InputBorder.none,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 24,
+                        color: borderColor.withOpacity(0.3),
+                        margin: const EdgeInsets.symmetric(horizontal: 12),
+                      ),
+                      // Filter Dropdown - FIXED: Use fixed values with display text
+                      DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _filterType,
+                          dropdownColor: cardBg,
+                          icon: Icon(
+                            Icons.filter_list_rounded,
+                            color: textSecondary.withOpacity(0.7),
+                            size: 18,
+                          ),
+                          style: TextStyle(
+                            color: textMain,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 13,
+                          ),
+                          items: [
+                            DropdownMenuItem(value: 'all', child: Text(tr('all'))),
+                            DropdownMenuItem(value: 'video', child: Text(tr('video'))),
+                            DropdownMenuItem(value: 'text', child: Text(tr('text'))),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setState(() => _filterType = val);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: 28),
+
+                // History List
+                if (_isLoading)
+                  Padding(
+                    padding: const EdgeInsets.all(60),
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: accentPrimary,
+                        strokeWidth: 2.5,
+                      ),
+                    ),
+                  )
+                else if (filteredScans.isEmpty)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 60),
+                      child: Column(
+                        children: [
+                          Icon(
+                            Icons.inbox_rounded,
+                            size: 56,
+                            color: textSecondary.withOpacity(0.5),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            tr('noScansFound'),
+                            style: TextStyle(
+                              color: textSecondary.withOpacity(0.7),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            _searchCtrl.text.isNotEmpty
+                                ? tr('tryAdjustingSearch')
+                                : tr('startAnalyzing'),
+                            style: TextStyle(
+                              color: textSecondary.withOpacity(0.6),
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  )
+                else
+                  ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: filteredScans.length,
+                    itemBuilder: (context, index) {
+                      return _buildHistoryCard(
+                        filteredScans[index],
+                        textMain,
+                        textSecondary,
+                        borderColor,
+                        cardBg,
+                        tr,
+                      );
+                    },
+                  ),
+
+                const SizedBox(height: 32),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildHistoryCard(Map<String, dynamic> item, bool isDark, Color cardCol, Color textCol, Color borderCol) {
-    bool isVideo = item['type'] == 'video';
-    bool isSafe = item['isSafe'];
-    Color statusColor = isSafe ? Colors.green : Colors.red;
+  Widget _buildStatCard(
+    String label,
+    String value,
+    IconData icon,
+    Color accentColor,
+    Color textSecondary,
+    Color cardBg,
+  ) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: accentColor.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: accentColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Icon(
+              icon,
+              color: accentColor,
+              size: 16,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Text(
+            value,
+            style: TextStyle(
+              color: accentColor,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+              letterSpacing: 0.3,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryCard(
+    Map<String, dynamic> item,
+    Color textMain,
+    Color textSecondary,
+    Color borderColor,
+    Color cardBg,
+    String Function(String) tr,
+  ) {
+    bool isVideo = item['scan_type']?.toString().toLowerCase() == 'video';
+    bool isThreat = item['is_threat'] == true;
+    Color statusColor = isThreat
+        ? const Color(0xFFDC2626)
+        : const Color(0xFF10B981);
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: cardCol,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: borderCol),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 10)],
+        color: cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: borderColor.withOpacity(0.5),
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
-          // 1. Icon
+          // Icon
           Container(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isVideo ? Colors.blue.withOpacity(0.1) : Colors.purple.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+              color: isVideo
+                  ? const Color(0xFF0EA5E9).withOpacity(0.1)
+                  : const Color(0xFFA855F7).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(
-              isVideo ? Icons.play_circle_fill : Icons.text_snippet,
-              color: isVideo ? Colors.blue : Colors.purple,
-              size: 24,
+              isVideo ? Icons.video_camera_front_rounded : Icons.text_snippet_rounded,
+              color: isVideo ? const Color(0xFF0EA5E9) : const Color(0xFFA855F7),
+              size: 20,
             ),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 14),
 
-          // 2. Info
+          // Info
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(item['name'], style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: textCol)),
+                Text(
+                  item['file_name'] ?? tr('unknownFile'),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                    color: textMain,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 const SizedBox(height: 4),
-                Text(item['date'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                Text(
+                  _formatDate(item['created_at'], tr),
+                  style: TextStyle(
+                    color: textSecondary.withOpacity(0.7),
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
               ],
             ),
           ),
 
-          // 3. Status Badge
+          // Status Badge
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: statusColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: statusColor.withOpacity(0.3)),
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: statusColor.withOpacity(0.3),
+                width: 1,
+              ),
             ),
             child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(isSafe ? Icons.check_circle : Icons.warning, color: statusColor, size: 14),
-                const SizedBox(width: 6),
-                Text(item['status'], style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12)),
+                Icon(
+                  isThreat ? Icons.warning_rounded : Icons.verified_user_rounded,
+                  color: statusColor,
+                  size: 13,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  isThreat ? tr('threat') : tr('safe'),
+                  style: TextStyle(
+                    color: statusColor,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                    letterSpacing: 0.3,
+                  ),
+                ),
               ],
             ),
           ),
-          
-          const SizedBox(width: 16),
 
-          // 4. Action Button
+          const SizedBox(width: 12),
+
+          // Actions
           IconButton(
-            icon: const Icon(Icons.arrow_forward_ios, size: 16, color: Colors.grey),
+            icon: Icon(
+              Icons.more_vert_rounded,
+              color: textSecondary.withOpacity(0.7),
+              size: 18,
+            ),
+            tooltip: tr('downloadReport'),
             onPressed: () {
-              // Open detailed report (You can link this to DeepfakeScreen results later)
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(tr('generatingPdfReport')),
+                  backgroundColor: const Color(0xFF0EA5E9),
+                  behavior: SnackBarBehavior.floating,
+                  duration: const Duration(seconds: 2),
+                ),
+              );
             },
-          )
+          ),
         ],
       ),
     );
+  }
+
+  String _formatDate(String? dateString, String Function(String) tr) {
+    if (dateString == null) return tr('unknownDate');
+    try {
+      final date = DateTime.parse(dateString);
+      final now = DateTime.now();
+      final difference = now.difference(date);
+
+      if (difference.inMinutes < 60) {
+        return '${difference.inMinutes} ${tr('minutesAgo')}';
+      } else if (difference.inHours < 24) {
+        return '${difference.inHours} ${tr('hoursAgo')}';
+      } else if (difference.inDays < 7) {
+        return '${difference.inDays} ${tr('daysAgo')}';
+      } else {
+        return '${date.month}/${date.day}/${date.year}';
+      }
+    } catch (e) {
+      return dateString;
+    }
   }
 }

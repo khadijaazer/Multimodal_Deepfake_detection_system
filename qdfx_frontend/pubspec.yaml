@@ -11,12 +11,18 @@ dependencies:
     sdk: flutter
   flutter_localizations:
     sdk: flutter
+
+    
+  # --- 3rd Party Packages ---
+  file_picker: ^8.0.0  # Kept exactly here, aligned with other packages
   http: ^1.1.0
   provider: ^6.1.1
   google_fonts: ^6.1.0
   dotted_border: ^2.1.0
   cupertino_icons: ^1.0.8
   supabase_flutter: ^2.12.0
+  pdf: ^3.10.7
+  printing: ^5.11.1
 
 dev_dependencies:
   flutter_test:
@@ -25,3 +31,8 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  # Add this so your logo works:
+  assets:
+    - assets/logowhite.png
+    - assets/logowhite2.png
+    - assets/logolight.png

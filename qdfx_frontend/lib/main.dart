@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // <--- SUPABASE IMPORT ADDED
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'providers/app_state.dart';
 import 'layout/responsive_layout.dart';
@@ -13,31 +13,35 @@ import 'theme/app_theme.dart';
 import 'screens/dashboard_screen.dart';
 import 'screens/billing_screen.dart';
 import 'screens/api_screen.dart';
-// import 'screens/auth/role_selection_screen.dart'; // <--- REMOVED (Not needed anymore)
 import 'screens/scam_detection_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/deepfake_screen.dart';
 import 'screens/auth/auth_screen.dart';
 import 'screens/realtime_screen.dart';
 import 'screens/history_screen.dart';
+import 'screens/profile_screen.dart';
 
-// --- MAIN FUNCTION IS NOW ASYNC ---
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized(); // Required for Supabase
+  WidgetsFlutterBinding.ensureInitialized();
 
-  // --- INITIALIZE SUPABASE HERE ---
   await Supabase.initialize(
-    url: 'https://qfvtxabqxurmnbsvznrj.supabase.co', // 🔴 PASTE YOUR URL HERE
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmdnR4YWJxeHVybW5ic3Z6bnJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMTk4OTEsImV4cCI6MjA4Nzg5NTg5MX0.-yvfWpIVlgeIxAZlRC4Hk9tDyE5ihNe3YsahE2LVdJU', // 🔴 PASTE YOUR ANON KEY HERE
+    url: 'https://qfvtxabqxurmnbsvznrj.supabase.co',
+    anonKey:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFmdnR4YWJxeHVybW5ic3Z6bnJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzIzMTk4OTEsImV4cCI6MjA4Nzg5NTg5MX0.-yvfWpIVlgeIxAZlRC4Hk9tDyE5ihNe3YsahE2LVdJU',
   );
+
+  final appState = AppState();
+  await appState.init();
 
   runApp(
     ChangeNotifierProvider(
-      create: (context) => AppState(),
+      create: (_) => appState,
       child: const QDFXApp(),
     ),
   );
 }
+
+// ─── App Root ─────────────────────────────────────────────────────────────────
 
 class QDFXApp extends StatelessWidget {
   const QDFXApp({super.key});
@@ -48,136 +52,112 @@ class QDFXApp extends StatelessWidget {
 
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'QDFX',
-      
-      // Themes
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: appState.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-      
-      // Localization
+      title: 'DETECTINI',
+      theme: appState.currentTheme,
       locale: appState.currentLocale,
-      supportedLocales: const[
+      supportedLocales: const [
         Locale('en', ''),
         Locale('fr', ''),
         Locale('ar', ''),
       ],
-      localizationsDelegates: const[
+      localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-
-      // Routes
-      initialRoute: '/landing', 
-
+      initialRoute: '/landing',
       routes: {
         '/landing': (context) => const LandingScreen(),
-        '/auth': (context) => const AuthScreen(),
-        '/': (context) => const MainScaffold(),
+        '/auth':    (context) => const AuthScreen(),
+        '/':        (context) => const MainScaffold(),
       },
     );
   }
 }
+
+// ─── Main Scaffold ────────────────────────────────────────────────────────────
 
 class MainScaffold extends StatelessWidget {
   const MainScaffold({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final selectedIndex = Provider.of<AppState>(context).selectedIndex;
+    final appState    = Provider.of<AppState>(context);
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isMobile    = screenWidth < 600;
 
-    Widget currentScreen;
-    
-    // SWITCH CASE MATCHING YOUR SIDEBAR INDEXES
-    switch (selectedIndex) {
-      case 0: 
-        currentScreen = const DashboardContent(); 
-        break;
-      case 1: 
-        currentScreen = const BillingScreen(); 
-        break;
-      case 2: 
-        currentScreen = const ApiScreen(); 
-        break;
-      case 3: 
-        // Text Scanner
-        currentScreen = const ScamDetectionScreen(); 
-        break;
-      case 4:
-        // Upload Video
-        currentScreen = const DeepfakeScreen(); 
-        break;
-      case 5:
-        // Real Time Hub
-        currentScreen = const RealTimeScreen();
-        break;
-      case 6:
-        // History 
-        currentScreen = HistoryScreen(); 
-        break;
-      default: 
-        currentScreen = const DashboardContent();
+    final Widget currentScreen = _screenForIndex(appState.selectedIndex);
+
+    // ── Mobile: Scaffold with Drawer ─────────────────────────────────
+    if (isMobile) {
+      return _MobileLayout(child: currentScreen);
     }
 
+    // ── Tablet & Desktop: persistent sidebar ─────────────────────────
     return Scaffold(
-      body: ResponsiveLayout(
-        mobileBody: MobileLayout(child: currentScreen),
-        desktopBody: Row(
-          children:[
-            const Sidebar(),
-            Expanded(child: currentScreen),
-          ],
-        ),
+      body: Row(
+        children: [
+          const Sidebar(),
+          Expanded(child: currentScreen),
+        ],
       ),
     );
   }
+
+  Widget _screenForIndex(int index) {
+    switch (index) {
+      case 0:  return const DashboardContent();
+      case 1:  return const BillingScreen();
+      case 2:  return const ApiScreen();
+      case 3:  return const ScamDetectionScreen();
+      case 4:  return const DeepfakeScreen();
+      case 5:  return const RealTimeScreen();
+      case 6:  return const HistoryScreen();
+      case 7:  return const ProfileScreen();
+      default: return const DashboardContent();
+    }
+  }
 }
 
-class MobileLayout extends StatelessWidget {
+// ─── Mobile Layout ────────────────────────────────────────────────────────────
+
+class _MobileLayout extends StatefulWidget {
   final Widget child;
-  const MobileLayout({super.key, required this.child});
+  const _MobileLayout({required this.child});
+
+  @override
+  State<_MobileLayout> createState() => _MobileLayoutState();
+}
+
+class _MobileLayoutState extends State<_MobileLayout> {
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppState>(context, listen: false);
-    final lang = appState.currentLocale.languageCode;
-    String t(String key) => AppTranslations.get(lang, key);
-
     return Scaffold(
+      key: _scaffoldKey,
+      
+      // ─── AppBar with ONLY the hamburger menu button ───────────────────
       appBar: AppBar(
-         title: Image.asset(
-          'assets/logo.png', 
-          height: 40, 
-          errorBuilder: (c,e,s) => const Text("QDFX"),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+          tooltip: 'Menu',
         ),
-        centerTitle: true, 
-        backgroundColor: Theme.of(context).cardTheme.color,
-        actions:[
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.language),
-            onSelected: (val) => appState.changeLanguage(val),
-            itemBuilder: (context) =>[
-              const PopupMenuItem(value: 'en', child: Text("English")),
-              const PopupMenuItem(value: 'fr', child: Text("Français")),
-              const PopupMenuItem(value: 'ar', child: Text("العربية")),
-            ],
-          ),
-        ],
+        title: null,
+        actions: const [],
       ),
-      body: child,
-      bottomNavigationBar: BottomNavigationBar(
-        backgroundColor: Theme.of(context).cardTheme.color,
-        selectedItemColor: Theme.of(context).primaryColor,
-        unselectedItemColor: Colors.grey,
-        currentIndex: appState.selectedIndex > 2 ? 0 : appState.selectedIndex,
-        onTap: (index) => appState.setIndex(index),
-        items:[
-          BottomNavigationBarItem(icon: const Icon(Icons.dashboard), label: t('dashboard')),
-          BottomNavigationBarItem(icon: const Icon(Icons.credit_card), label: t('billing')),
-          BottomNavigationBarItem(icon: const Icon(Icons.code), label: t('api')),
-        ],
+
+      // ─── Drawer (uses the same Sidebar widget) ───────────────────────
+      drawer: Drawer(
+        backgroundColor: const Color(0xFF0F172A),
+        child: const Sidebar(),
       ),
+
+      // ─── Body ─────────────────────────────────────────────────────────
+      body: widget.child,
     );
   }
 }

@@ -9,7 +9,9 @@ import '../../providers/app_state.dart';
 import '../landing_screen.dart'; // To reuse CircuitPainter
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  final bool showSignUp; // Add this parameter
+  
+  const AuthScreen({super.key, this.showSignUp = false});
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -17,9 +19,10 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   // State
-  bool _isLogin = true; 
+  late bool _isLogin; // Change to late
   bool _isProfessional = false; 
   bool _isVerifying = false; 
+  bool _obscurePassword = true; // State variable to track password visibility
   String _selectedOrgType = "Media/Press";
 
   // Controllers
@@ -31,7 +34,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
   final List<String> _orgTypes =[
     "Media/Press",
-    "Enterprise",
+    "Enterprise", 
     "Police/Security",
     "Other Institution"
   ];
@@ -40,6 +43,23 @@ class _AuthScreenState extends State<AuthScreen> {
   final List<String> _freeEmailProviders =[
     'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com', 'mail.ru'
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Set _isLogin based on widget parameter - if showSignUp is true, show signup form
+    _isLogin = !widget.showSignUp;
+  }
+
+  @override
+  void dispose() {
+    _emailCtrl.dispose();
+    _passCtrl.dispose();
+    _nameCtrl.dispose();
+    _orgNameCtrl.dispose();
+    _positionCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,27 +73,30 @@ class _AuthScreenState extends State<AuthScreen> {
     Color borderCol = isDark ? Colors.white.withOpacity(0.1) : Colors.grey.shade300;
     Color primary = AppTheme.primaryBlue;
 
+    // Theme‑aware circuit colour (white in dark, black in light)
+    final circuitColor = (isDark ? Colors.white : Colors.black).withOpacity(0.03);
+
     return Scaffold(
       backgroundColor: bg,
       body: Stack(
-        children:[
-          if (isDark)
-            Positioned.fill(
-              child: CustomPaint(painter: CircuitBoardPainter(color: Colors.white.withOpacity(0.03))),
+        children: [
+          // ─── ALWAYS SHOW CIRCUIT PATTERN (same as landing page) ──────────
+          Positioned.fill(
+            child: CustomPaint(
+              painter: CircuitBoardPainter(color: circuitColor),
             ),
+          ),
           Center(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(24),
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children:[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children:[
-                      Image.asset('assets/logo.png', height: 40, errorBuilder: (c,e,s)=>Icon(Icons.shield, color: primary)),
-                      const SizedBox(width: 10),
-                      Text("QDFX", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: textMain)),
-                    ],
+                children: [
+                  // ─── THEME‑AWARE LOGO (same as landing page) ──────────────
+                  Image.asset(
+                    isDark ? 'assets/logowhite2.png' : 'assets/logolight.png',
+                    height: 80,
+                    errorBuilder: (c, e, s) => Icon(Icons.shield, color: primary, size: 60),
                   ),
                   const SizedBox(height: 30),
 
@@ -84,17 +107,26 @@ class _AuthScreenState extends State<AuthScreen> {
                       color: cardBg,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: borderCol),
-                      boxShadow:[
-                        BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 20, offset: const Offset(0, 10))
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 20,
+                          offset: const Offset(0, 10),
+                        )
                       ],
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children:[
+                      children: [
                         Text(
-                          _isLogin ? "QDFX > Login" : "QDFX > Sign Up",
+                          _isLogin ? "Login" : "Sign Up",
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: textMain),
+                          style: TextStyle(
+                            fontSize: 24, 
+                            fontWeight: FontWeight.bold, 
+                            color: textMain,
+                            letterSpacing: 1.1,
+                          ),
                         ),
                         const SizedBox(height: 24),
 
@@ -107,7 +139,7 @@ class _AuthScreenState extends State<AuthScreen> {
                             border: Border.all(color: borderCol),
                           ),
                           child: Row(
-                            children:[
+                            children: [
                               _buildTab("SIMPLE USER", !_isProfessional, () => setState(() => _isProfessional = false), textMain, primary),
                               _buildTab("PROFESSIONAL USER", _isProfessional, () => setState(() => _isProfessional = true), textMain, primary),
                             ],
@@ -170,15 +202,11 @@ class _AuthScreenState extends State<AuthScreen> {
                         if (_isLogin)
                           Align(
                             alignment: Alignment.centerRight,
-                            child: TextButton(onPressed: () {}, child: Text("Forgot Password?", style: TextStyle(color: textSub, fontSize: 12))),
+                            child: TextButton(
+                              onPressed: () => _showForgotPasswordDialog(context, isDark, cardBg, textMain, textSub, borderCol, primary),
+                              child: Text("Forgot Password?", style: TextStyle(color: textSub, fontSize: 12)),
+                            ),
                           ),
-
-                        if (!_isLogin && _isProfessional) ...[
-                          const SizedBox(height: 16),
-                          _buildUploadBox(isDark, textMain, borderCol, primary),
-                          const SizedBox(height: 8),
-                          Text("Required for ID/Registration verification", style: TextStyle(color: textSub, fontSize: 10)),
-                        ],
 
                         const SizedBox(height: 24),
 
@@ -258,7 +286,7 @@ class _AuthScreenState extends State<AuthScreen> {
         _buildLabel(label, textCol),
         TextField(
           controller: ctrl,
-          obscureText: isPass,
+          obscureText: isPass ? _obscurePassword : false,
           style: TextStyle(color: textCol),
           decoration: InputDecoration(
             hintText: hint,
@@ -268,25 +296,129 @@ class _AuthScreenState extends State<AuthScreen> {
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: borderCol)),
             focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF3B82F6))),
-            suffixIcon: isPass ? Icon(Icons.visibility_off, size: 18, color: textCol.withOpacity(0.4)) : null,
+            suffixIcon: isPass 
+                ? IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                      size: 18, 
+                      color: textCol.withOpacity(0.4),
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ) 
+                : null,
           ),
         ),
       ],
     );
   }
 
-  Widget _buildUploadBox(bool isDark, Color textCol, Color borderCol, Color primary) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(color: isDark ? const Color(0xFF0B1121) : Colors.grey.shade50, borderRadius: BorderRadius.circular(12), border: Border.all(color: borderCol, style: BorderStyle.solid)),
-      child: Column(
-        children:[
-          Icon(Icons.cloud_upload_outlined, color: primary, size: 30),
-          const SizedBox(height: 8),
-          Text("UPLOAD DOCUMENT", style: TextStyle(color: textCol, fontWeight: FontWeight.bold, fontSize: 12)),
-        ],
-      ),
+  // --- PASSWORD RESET OVERLAY DIALOG ---
+  void _showForgotPasswordDialog(BuildContext context, bool isDark, Color cardBg, Color textMain, Color textSub, Color borderCol, Color primary) {
+    final resetEmailCtrl = TextEditingController(text: _emailCtrl.text.trim());
+    bool isSending = false;
+
+    showDialog(
+      context: context,
+      builder: (dialogCtx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: cardBg,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: Text(
+                "Reset Password",
+                style: TextStyle(color: textMain, fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    "Enter your email address to receive a secure password reset link.",
+                    style: TextStyle(color: textSub, fontSize: 13, height: 1.4),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildInput("Email Address", "name@company.com", false, isDark, textMain, borderCol, resetEmailCtrl),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isSending ? null : () => Navigator.pop(dialogCtx),
+                  child: Text("Cancel", style: TextStyle(color: textSub)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  onPressed: isSending
+                      ? null
+                      : () async {
+                          final email = resetEmailCtrl.text.trim().toLowerCase();
+                          if (email.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Email is required"), backgroundColor: Colors.red),
+                            );
+                            return;
+                          }
+
+                          setDialogState(() => isSending = true);
+
+                          try {
+                            // 1. Explicitly check if the email exists in public profiles table first
+                            final emailCheck = await Supabase.instance.client
+                                .from('profiles')
+                                .select('id')
+                                .eq('email', email)
+                                .maybeSingle();
+
+                            if (emailCheck == null) {
+                              throw Exception("This email address is not registered in our database.");
+                            }
+
+                            // 2. If valid, trigger password reset flow
+                            await Supabase.instance.client.auth.resetPasswordForEmail(
+                              email,
+                              redirectTo: 'detectini://reset-password',
+                            );
+                            
+                            if (mounted) {
+                              Navigator.pop(dialogCtx);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text("Password reset link sent to $email"),
+                                  backgroundColor: Colors.green,
+                                ),
+                              );
+                            }
+                          } catch (e) {
+                            if (mounted) {
+                              String err = e.toString().replaceAll("Exception: ", "");
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text(err), backgroundColor: Colors.red),
+                              );
+                            }
+                          } finally {
+                            setDialogState(() => isSending = false);
+                          }
+                        },
+                  child: isSending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : const Text("Send", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
     );
   }
 
@@ -318,12 +450,11 @@ class _AuthScreenState extends State<AuthScreen> {
           }
 
           // Call Python Backend for Consensus Verification
-          // Remember to change to 10.0.2.2 if on Android Emulator
-          final url = Uri.parse('http://127.0.0.1:8000/api/auth/verify-corporate-email');
+          final url = Uri.parse('https://khadidjaabderrahmane-detectini-backend.hf.space/api/auth/verify-corporate-email');
           final response = await http.post(
             url,
             headers: {"Content-Type": "application/json"},
-            body: jsonEncode({"email": email, "company_name": _orgNameCtrl.text}),
+            body: jsonEncode({"email": email, "company_name": _orgNameCtrl.text, "organization_type": _selectedOrgType}),
           ).timeout(const Duration(seconds: 15));
 
           if (response.statusCode == 200) {
@@ -342,50 +473,103 @@ class _AuthScreenState extends State<AuthScreen> {
           password: password,
           data: {
             'full_name': _nameCtrl.text,
-            // If professional, we save the company name. Database trigger handles the rest.
-            'company_name': _isProfessional ? _orgNameCtrl.text : '', 
+            'company_name': _isProfessional ? _orgNameCtrl.text : '',
+            'organization_type': _isProfessional ? _selectedOrgType : '',
+            'position': _isProfessional ? _positionCtrl.text : '',
           }
         );
 
         if (res.user != null) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Account Created Successfully!"), backgroundColor: Colors.green));
+          
+          // Auto login after signup
+          if (mounted) {
+            // Sign in automatically after signup
+            await supabase.auth.signInWithPassword(
+              email: email,
+              password: password,
+            );
+            
+            // Fetch user profile
+            final userData = await supabase
+                .from('profiles')
+                .select('subscription_plan, full_name, credits, company_name')
+                .eq('id', supabase.auth.currentUser!.id)
+                .single();
+
+            // Update AppState
+            appState.setLoggedInUser(
+              userData['full_name'] ?? 'User',
+              email,
+              userData['subscription_plan'] ?? 'free',
+              userData['credits'] ?? 0,
+              userData['company_name'] ?? ''
+            );
+
+            // Navigate to Dashboard
+            Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+          }
         }
       } 
       
       // ==========================================
       // FLOW 2: LOGIN
       // ==========================================
-      
-      // Sign in with Supabase
-      await supabase.auth.signInWithPassword(
-        email: email,
-        password: password,
-      );
+      else {
+        // --- A. Client-Side Domain Pre-Check ---
+        bool isFreeEmail = _freeEmailProviders.any((domain) => email.endsWith('@$domain'));
+        if (_isProfessional && isFreeEmail) {
+          throw Exception("Professional login requires a corporate email address.");
+        }
+        if (!_isProfessional && !isFreeEmail) {
+          throw Exception("Please use the Professional User tab to log in with a corporate email.");
+        }
 
-      // Fetch their profile from the database to see their tier/role
-      final userData = await supabase
-          .from('profiles')
-          .select('subscription_plan, full_name, credits, company_name')
-          .eq('id', supabase.auth.currentUser!.id)
-          .single();
+        // --- B. Sign in with Supabase ---
+        await supabase.auth.signInWithPassword(
+          email: email,
+          password: password,
+        );
 
-      // Update AppState so the Dashboard knows exactly who is logged in
-      appState.setLoggedInUser(
-        userData['full_name'] ?? 'User',
-        email,
-        userData['subscription_plan'] ?? 'free',
-        userData['credits'] ?? 0,
-        userData['company_name'] ?? ''
-      );
+        // --- C. Fetch User Profile ---
+        final userData = await supabase
+            .from('profiles')
+            .select('subscription_plan, full_name, credits, company_name')
+            .eq('id', supabase.auth.currentUser!.id)
+            .single();
 
-      // Navigate to Dashboard
-      if (mounted) {
-        Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+        // --- D. Database Role/Plan Verification Guard ---
+        final companyName = userData['company_name'] ?? '';
+        final plan = userData['subscription_plan'] ?? 'free';
+        final isProOrEnterprise = plan == 'pro' || plan == 'enterprise' || companyName.toString().trim().isNotEmpty;
+
+        if (_isProfessional && !isProOrEnterprise) {
+          await supabase.auth.signOut();
+          throw Exception("This account is registered as a Simple User. Please use the Simple User tab to log in.");
+        }
+
+        if (!_isProfessional && isProOrEnterprise) {
+          await supabase.auth.signOut();
+          throw Exception("This account is registered as a Professional User. Please use the Professional User tab to log in.");
+        }
+
+        // Update AppState so the Dashboard knows exactly who is logged in
+        appState.setLoggedInUser(
+          userData['full_name'] ?? 'User',
+          email,
+          userData['subscription_plan'] ?? 'free',
+          userData['credits'] ?? 0,
+          userData['company_name'] ?? ''
+        );
+
+        // Navigate to Dashboard
+        if (mounted) {
+          Navigator.pushNamedAndRemoveUntil(context, '/', (route) => false);
+        }
       }
 
     } catch (e) {
       if (mounted) {
-        // Clean up the error message for the user
         String errorMsg = e.toString().replaceAll("Exception: ", "").replaceAll("AuthException: ", "");
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(errorMsg), backgroundColor: Colors.red)
